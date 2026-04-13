@@ -10,7 +10,7 @@ on:
 jobs:
   deploy:
     # This specifies to use our self-hosted runner
-    runs-on: [self-hosted, linux, development, ubuntu-24]
+    runs-on: [self-hosted, Linux, X64]
     
     steps:
       # Step 1: Get the code from the repository
