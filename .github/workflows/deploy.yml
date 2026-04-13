@@ -1,0 +1,69 @@
+name: Deploy Static Site
+# This defines when the workflow runs
+on:
+  push:
+    branches:
+      - main  # Trigger on pushes to the main branch
+  workflow_dispatch:  # Allow manual triggering from GitHub UI
+
+# Define the job(s) to run
+jobs:
+  deploy:
+    # This specifies to use our self-hosted runner
+    runs-on: [self-hosted, linux, development, ubuntu-24]
+    
+    steps:
+      # Step 1: Get the code from the repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          clean: true  # Remove any untracked files before checkout
+      
+      # Step 2: Display what we're deploying (useful for debugging)
+      - name: Display deployment info
+        run: |
+          echo "Deploying commit: ${{ github.sha }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "Branch: ${{ github.ref }}"
+      
+      # Step 3: Create backup of current site (optional but recommended)
+      - name: Backup current site
+        run: |
+          if [ -d "/var/www/static-site" ]; then
+            cp -r /var/www/static-site /var/www/static-site.backup.$(date +%Y%m%d_%H%M%S)
+            # Keep only the 4 most recent backups
+            cd /var/www && ls -t | grep static-site.backup | tail -n +5| xargs -r  rm -rf
+          fi
+      
+      # Step 4: Deploy the new files
+      - name: Deploy to web server
+        run: |
+          # Remove old files
+          sudo rm -rf /var/www/static-site/*
+          
+          # Copy new files
+          cp -r ${{ github.workspace }}/* /var/www/static-site/
+          
+          # Set proper permissions
+          chmod -R 755 /var/www/static-site
+          
+          # Ensure index.html exists
+          if [ ! -f "/var/www/static-site/index.html" ]; then
+            echo "Error: index.html not found!"
+            exit 1
+          fi
+
+      
+      # Step 5: Test the deployment
+      - name: Test deployment
+        run: |
+          # Wait a moment for files to be available
+          sleep 2
+          
+          # Test if the site responds
+          if curl -f http://localhost > /dev/null 2>&1; then
+            echo "Site is responding correctly"
+          else
+            echo "Warning: Site may not be responding"
+            exit 1
+          fi
